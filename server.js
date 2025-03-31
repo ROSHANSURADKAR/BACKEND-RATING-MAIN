@@ -97,14 +97,49 @@ app.post('/users/login', (req, res) => {
     }
   });
 });
-// Delete rating
-app.delete("/ratings/:id", (req, res) => {
-  const { id } = req.params;
-  db.query("DELETE FROM ratings WHERE id = ?", [id], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "Rating deleted" });
+
+
+app.post('/admins/register', (req, res) => {
+  const { name, email, password } = req.body;
+  const otp = Math.floor(100000 + Math.random() * 900000);
+
+  bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) return res.status(500).json({ message: 'Error hashing password' });
+
+      const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?, 0)';
+      db.query(sql, [name, email, hashedPassword, otp], (error, result) => {
+          if (error) {
+              console.error('Database error:', error);
+              return res.status(500).json({ message: 'Database error' });
+          }
+          res.json({ message: 'Admin registered. OTP sent!', otp });
+      });
   });
 });
+
+// Verify OTP
+app.post('/admins/verify-otp', (req, res) => {
+  const { email, otp } = req.body;
+
+  db.query('SELECT * FROM admin WHERE email = ? AND otp = ?', [email, otp], (err, result) => {
+      if (err) return res.status(500).json({ message: 'Database error' });
+
+      if (result.length > 0) {
+          db.query('UPDATE admin SET is_verified = 1 WHERE email = ?', [email], (error) => {
+              if (error) return res.status(500).json({ message: 'Database update error' });
+              res.status(200).json({ message: 'Admin verified successfully' });
+          });
+      } else {
+          res.status(400).json({ message: 'Invalid OTP' });
+      }
+  });
+});
+
+
+
+
+
+
 
 
 // Start the server
