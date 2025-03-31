@@ -97,6 +97,15 @@ app.post('/users/login', (req, res) => {
     }
   });
 });
+// Delete rating
+app.delete("/ratings/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM ratings WHERE id = ?", [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: "Rating deleted" });
+  });
+});
+
 
 // Start the server
 app.listen(5000, () => {
