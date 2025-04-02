@@ -99,15 +99,15 @@ app.post('/users/login', (req, res) => {
 });
 
 
-app.post('/admins/register', (req, res) => {
+app.post('/admin/register', (req, res) => {
   const { name, email, password } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000);
 
-  bcrypt.hash(password, 10, (err, hashedPassword) => {
+  bcrypt.hash(password, 10, (err, Password) => {
       if (err) return res.status(500).json({ message: 'Error hashing password' });
 
       const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?, 0)';
-      db.query(sql, [name, email, hashedPassword, otp], (error, result) => {
+      db.query(sql, [name, email, Password, otp], (error, result) => {
           if (error) {
               console.error('Database error:', error);
               return res.status(500).json({ message: 'Database error' });
@@ -118,7 +118,7 @@ app.post('/admins/register', (req, res) => {
 });
 
 // Verify OTP
-app.post('/admins/verify-otp', (req, res) => {
+app.post('/admin/verify-otp', (req, res) => {
   const { email, otp } = req.body;
 
   db.query('SELECT * FROM admin WHERE email = ? AND otp = ?', [email, otp], (err, result) => {
@@ -134,11 +134,35 @@ app.post('/admins/verify-otp', (req, res) => {
       }
   });
 });
+app.post('/admin/login', (req, res) => {
+  const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
 
+  const query = 'SELECT * FROM admin WHERE email = ? AND is_verified = 1';
+  db.query(query, [email], async (err, result) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
 
+    if (result.length === 0) {
+      return res.status(400).json({ message: 'Invalid credentials or account not verified' });
+    }
 
+    const admin = result[0];
 
+    // Compare hashed password
+    const passwordMatch = await bcrypt.compare(password, admin.password);
+    if (!passwordMatch) {
+      return res.status(400).json({ message: 'Incorrect password' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: admin.id, email: admin.email }, 'your_secret_key', { expiresIn: '1h' });
+
+    res.status(200).json({ message: 'Login successful', token, admin });
+  });
+});
 
 
 
