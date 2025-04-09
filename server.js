@@ -103,11 +103,10 @@ app.post('/admin/register', (req, res) => {
   const { name, email, password } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000);
 
-  bcrypt.hash(password, 10, (err, Password) => {
-      if (err) return res.status(500).json({ message: 'Error hashing password' });
+  
 
-      const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?, 0)';
-      db.query(sql, [name, email, Password, otp], (error, result) => {
+      const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?,0)';
+      db.query(sql, [name, email, password, otp], (error, result) => {
           if (error) {
               console.error('Database error:', error);
               return res.status(500).json({ message: 'Database error' });
@@ -115,7 +114,10 @@ app.post('/admin/register', (req, res) => {
           res.json({ message: 'Admin registered. OTP sent!', otp });
       });
   });
-});
+
+
+
+
 
 // Verify OTP
 app.post('/admin/verify-otp', (req, res) => {
@@ -160,7 +162,7 @@ app.post('/admin/login', (req, res) => {
     // Generate JWT token
     const token = jwt.sign({ id: admin.id, email: admin.email }, 'your_secret_key', { expiresIn: '1h' });
 
-    res.status(200).json({ message: 'Login successful', token, admin });
+    res.status(200).json({ message: 'Login successful',  admin });
   });
 });
 
