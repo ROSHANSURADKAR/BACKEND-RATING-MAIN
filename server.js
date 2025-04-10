@@ -136,37 +136,23 @@ app.post('/admin/verify-otp', (req, res) => {
       }
   });
 });
-app.post('/admin/login', (req, res) => {
+app.post('/admin-login', (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "Email and password are required" });
-  }
-
-  const query = 'SELECT * FROM admin WHERE email = ? AND is_verified = 1';
-  db.query(query, [email], async (err, result) => {
-    if (err) return res.status(500).json({ message: 'Database error' });
-
-    if (result.length === 0) {
-      return res.status(400).json({ message: 'Invalid credentials or account not verified' });
-    }
+  db.query('SELECT * FROM admin WHERE email = ?', [email], async (err, result) => {
+    if (err) return res.json({ success: false, message: 'Database error' });
+    if (result.length === 0) return res.json({ success: false, message: 'Admin not found' });
 
     const admin = result[0];
+    const isValid = await bcrypt.compare(password, admin.password);
 
-    // Compare hashed password
-    const passwordMatch = await bcrypt.compare(password, admin.password);
-    if (!passwordMatch) {
-      return res.status(400).json({ message: 'Incorrect password' });
+    if (isValid && admin.is_verified === 1) {
+      res.json({ success: true, message: 'Login successful' });
+    } else {
+      res.json({ success: false, message: 'Invalid credentials or not verified' });
     }
-
-    // Generate JWT token
-    const token = jwt.sign({ id: admin.id, email: admin.email }, 'your_secret_key', { expiresIn: '1h' });
-
-    res.status(200).json({ message: 'Login successful',  admin });
   });
 });
-
-
 
 // Start the server
 app.listen(5000, () => {
