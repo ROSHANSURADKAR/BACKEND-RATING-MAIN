@@ -6,7 +6,8 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require('nodemailer');
-
+const JWT_SECRET = "your_secret_key";
+const saltRounds = 10;
 
 const app = express();
 app.use(cors());
@@ -99,22 +100,25 @@ app.post('/users/login', (req, res) => {
 });
 
 
-app.post('/admin/register', (req, res) => {
+app.post('/admin/register', async (req, res) => {
   const { name, email, password } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000);
 
-  
-
-      const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?,0)';
-      db.query(sql, [name, email, password, otp], (error, result) => {
-          if (error) {
-              console.error('Database error:', error);
-              return res.status(500).json({ message: 'Database error' });
-          }
-          res.json({ message: 'Admin registered. OTP sent!', otp });
-      });
-  });
-
+  try {
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?, 0)';
+    
+    db.query(sql, [name, email, hashedPassword, otp], (error, result) => {
+      if (error) {
+        console.error('Database error:', error);
+        return res.status(500).json({ message: 'Database error' });
+      }
+      res.json({ message: 'Admin registered. OTP sent!', otp });
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error hashing password' });
+  }
+});
 
 
 
@@ -136,21 +140,32 @@ app.post('/admin/verify-otp', (req, res) => {
       }
   });
 });
-app.post('/admin-login', (req, res) => {
+app.post('/admin/login', (req, res) => {
   const { email, password } = req.body;
 
-  db.query('SELECT * FROM admin WHERE email = ?', [email], async (err, result) => {
-    if (err) return res.json({ success: false, message: 'Database error' });
-    if (result.length === 0) return res.json({ success: false, message: 'Admin not found' });
+  const sql = 'SELECT * FROM admin WHERE email = ? AND is_verified = 1';
+  db.query(sql, [email], async (err, results) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
+    if (results.length === 0) return res.status(400).json({ message: 'Admin not found or not verified' });
 
-    const admin = result[0];
-    const isValid = await bcrypt.compare(password, admin.password);
+    const admin = results[0];
+    const passwordMatch = await bcrypt.compare(password, admin.password);
 
-    if (isValid && admin.is_verified === 1) {
-      res.json({ success: true, message: 'Login successful' });
-    } else {
-      res.json({ success: false, message: 'Invalid credentials or not verified' });
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Incorrect password' });
     }
+
+    const token = jwt.sign({ adminId: admin.id }, 'your_secret_key', { expiresIn: '1h' });
+    res.status(200).json({ message: 'Login successful', token });
+  });
+});
+// Delete rating
+app.delete('/ratings/:id', (req, res) => {
+  const ratingId = req.params.id;
+  const sql = 'DELETE FROM ratings WHERE id = ?';
+  db.query(sql, [ratingId], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Rating deleted successfully' });
   });
 });
 
