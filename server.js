@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require('nodemailer');
-const JWT_SECRET = "your_secret_key";
+const JWT_SECRET = "y";
 const saltRounds = 10;
 
 const app = express();
@@ -20,6 +20,7 @@ const db = mysql.createConnection({
   password: "root",
   database: "user_ratings_db",
 });
+
 
 db.connect((err) => {
   if (err) throw err;
@@ -55,7 +56,7 @@ db.connect(err => {
 app.post('/users/register', (req, res) => {
   const { email, password } = req.body;
   const otp = Math.floor(100000 + Math.random() * 900000); // Generate a random OTP
-
+ 
   const query = 'INSERT INTO users (email, password, otp, is_verified) VALUES (?, ?, ?, ?)';
   db.query(query, [email, password, otp, 0], (err, result) => {
     if (err) {
@@ -65,7 +66,6 @@ app.post('/users/register', (req, res) => {
     res.status(200).send({ message: 'OTP sent to email', otp }); // Simulating OTP sending
   });
 });
-
 // 🔹 Verify OTP
 app.post('/users/verify-otp', (req, res) => {
   const { email, otp } = req.body;
