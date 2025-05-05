@@ -53,19 +53,46 @@ db.connect(err => {
 });
 
 // 🔹 Register User (Insert into MySQL)
+
+
 app.post('/users/register', (req, res) => {
-  const { email, password } = req.body;
-  const otp = Math.floor(100000 + Math.random() * 900000); // Generate a random OTP
- 
-  const query = 'INSERT INTO users (email, password, otp, is_verified) VALUES (?, ?, ?, ?)';
-  db.query(query, [email, password, otp, 0], (err, result) => {
+  const {
+    first_name,
+    last_name,
+    email,
+    password,
+    confirm_password,
+    address,
+    phone_number
+  } = req.body;
+
+  if (password !== confirm_password) {
+    return res.status(400).send({ message: 'Passwords do not match' });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000); // Generate OTP
+
+  // Hash the password
+  bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
     if (err) {
-      console.error('Error inserting user:', err);
-      return res.status(500).send({ message: 'Database error' });
+      console.error('Error hashing password:', err);
+      return res.status(500).send({ message: 'Error hashing password' });
     }
-    res.status(200).send({ message: 'OTP sent to email', otp }); // Simulating OTP sending
+
+    const query = `INSERT INTO users (first_name, last_name, email, password, address, phone_number, otp, is_verified)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 0)`;
+
+    db.query(query, [first_name, last_name, email, hashedPassword, address, phone_number, otp], (err, result) => {
+      if (err) {
+        console.error('Error inserting user:', err);
+        return res.status(500).send({ message: 'Database error' });
+      }
+
+      res.status(200).send({ message: 'OTP sent to email', otp });
+    });
   });
 });
+
 // 🔹 Verify OTP
 app.post('/users/verify-otp', (req, res) => {
   const { email, otp } = req.body;
@@ -87,15 +114,26 @@ app.post('/users/verify-otp', (req, res) => {
 app.post('/users/login', (req, res) => {
   const { email, password } = req.body;
 
-  const query = 'SELECT * FROM users WHERE email = ? AND password = ? AND is_verified = 1';
-  db.query(query, [email, password], (err, result) => {
+  const query = 'SELECT * FROM users WHERE email = ? AND is_verified = 1';
+  db.query(query, [email], (err, results) => {
     if (err) return res.status(500).send({ message: 'Database error' });
 
-    if (result.length > 0) {
-      res.status(200).send({ message: 'Login successful', user: result[0] });
-    } else {
-      res.status(400).send({ message: 'Invalid credentials or not verified' });
+    if (results.length === 0) {
+      return res.status(400).send({ message: 'User not found or not verified' });
     }
+
+    const user = results[0];
+
+    // Compare password with hash
+    bcrypt.compare(password, user.password, (err, isMatch) => {
+      if (err) return res.status(500).send({ message: 'Error comparing passwords' });
+
+      if (isMatch) {
+        res.status(200).send({ message: 'Login successful', user });
+      } else {
+        res.status(400).send({ message: 'Invalid credentials' });
+      }
+    });
   });
 });
 
