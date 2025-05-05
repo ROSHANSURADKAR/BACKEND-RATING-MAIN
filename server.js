@@ -139,14 +139,19 @@ app.post('/users/login', (req, res) => {
 
 
 app.post('/admin/register', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { first_name, last_name, email, password,confirm_password, phone_number } = req.body;
+  
+
   const otp = Math.floor(100000 + Math.random() * 900000);
 
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
-    const sql = 'INSERT INTO admin (name, email, password, otp, is_verified) VALUES (?, ?, ?, ?, 0)';
-    
-    db.query(sql, [name, email, hashedPassword, otp], (error, result) => {
+    const sql = `
+      INSERT INTO admin (first_name, last_name, email, password, phone_number, otp, is_verified) 
+      VALUES (?, ?, ?, ?, ?, ?, 0)
+    `;
+
+    db.query(sql, [first_name, last_name, email, hashedPassword, phone_number, otp], (error, result) => {
       if (error) {
         console.error('Database error:', error);
         return res.status(500).json({ message: 'Database error' });
