@@ -2,11 +2,11 @@ require('dotenv').config();
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const nodemailer = require('nodemailer');
-const JWT_SECRET = "y";
+
+const JWT_SECRET = "wkdb difu qaee ayyp";
 const saltRounds = 10;
 
 const app = express();
@@ -21,13 +21,113 @@ const db = mysql.createConnection({
   database: "user_ratings_db",
 });
 
-
 db.connect((err) => {
-  if (err) throw err;
+  if (err) {
+    console.error('Database connection failed:', err);
+    return;
+  }
   console.log("MySQL Connected...");
 });
 
-// Insert rating
+// Email transporter (using Gmail + App Password)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+});
+
+transporter.verify((err, success) => {
+  if (err) {
+    console.error("Email transporter error:", err);
+  } else {
+    console.log("Email transporter is ready");
+  }
+});
+
+// ✅ User Registration with OTP email
+app.post("/users/register", (req, res) => {
+  const { first_name, last_name, email, password, confirm_password, address, phone_number } = req.body;
+
+  if (password !== confirm_password) {
+    return res.status(400).json({ message: "Passwords do not match" });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000); // 6-digit OTP
+
+  bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
+    if (err) return res.status(500).json({ message: "Error hashing password" });
+
+    const sql = `
+      INSERT INTO users (first_name, last_name, email, password, address, phone_number, otp, is_verified)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+    `;
+
+    db.query(sql, [first_name, last_name, email, hashedPassword, address, phone_number, otp], (err, result) => {
+      if (err) return res.status(500).json({ message: "Database error", error: err });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Your OTP for Registration",
+        text: `Your OTP is: ${otp}`
+      };
+
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) return res.status(500).json({ message: "Error sending OTP email", error: err });
+        res.status(200).json({ message: "OTP sent to email" });
+      });
+    });
+  });
+});
+
+// ✅ User Verify OTP
+app.post("/users/verify-otp", (req, res) => {
+  const { email, otp } = req.body;
+
+  const sql = "SELECT * FROM users WHERE email = ? AND otp = ?";
+  db.query(sql, [email, otp], (err, result) => {
+    if (err) return res.status(500).json({ message: "Database error" });
+
+    if (result.length > 0) {
+      db.query("UPDATE users SET is_verified = 1 WHERE email = ?", [email], (err) => {
+        if (err) return res.status(500).json({ message: "Error updating verification status" });
+        res.status(200).json({ message: "User verified successfully" });
+      });
+    } else {
+      res.status(400).json({ message: "Invalid OTP" });
+    }
+  });
+});
+
+// ✅ User Login
+app.post("/users/login", (req, res) => {
+  const { email, password } = req.body;
+
+  const sql = "SELECT * FROM users WHERE email = ? AND is_verified = 1";
+  db.query(sql, [email], (err, results) => {
+    if (err) return res.status(500).json({ message: "Database error" });
+
+    if (results.length === 0) {
+      return res.status(400).json({ message: "User not found or not verified" });
+    }
+
+    const user = results[0];
+
+    bcrypt.compare(password, user.password, (err, isMatch) => {
+      if (err) return res.status(500).json({ message: "Error comparing passwords" });
+
+      if (isMatch) {
+        res.status(200).json({ message: "Login successful", user });
+      } else {
+        res.status(400).json({ message: "Invalid credentials" });
+      }
+    });
+  });
+});
+
+// ✅ Insert Rating
 app.post("/ratings", (req, res) => {
   const { user_name, rating, comments } = req.body;
   const sql = "INSERT INTO ratings (user_name, rating, comments) VALUES (?, ?, ?)";
@@ -37,110 +137,31 @@ app.post("/ratings", (req, res) => {
   });
 });
 
-// Get all ratings
+// ✅ Get all ratings
 app.get("/ratings", (req, res) => {
   db.query("SELECT * FROM ratings", (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
 });
-db.connect(err => {
-  if (err) {
-    console.error('Database connection failed:', err);
-  } else {
-    console.log('Connected to MySQL');
-  }
+
+// ✅ Delete rating by ID
+app.delete('/ratings/:id', (req, res) => {
+  const ratingId = req.params.id;
+  const sql = 'DELETE FROM ratings WHERE id = ?';
+  db.query(sql, [ratingId], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Rating deleted successfully' });
+  });
 });
 
-// 🔹 Register User (Insert into MySQL)
-
-
-app.post('/users/register', (req, res) => {
-  const {
-    first_name,
-    last_name,
-    email,
-    password,
-    confirm_password,
-    address,
-    phone_number
-  } = req.body;
+// ✅ Admin Registration with OTP
+app.post('/admin/register', async (req, res) => {
+  const { first_name, last_name, email, password, confirm_password, phone_number } = req.body;
 
   if (password !== confirm_password) {
-    return res.status(400).send({ message: 'Passwords do not match' });
+    return res.status(400).json({ message: "Passwords do not match" });
   }
-
-  const otp = Math.floor(100000 + Math.random() * 900000); // Generate OTP
-
-  // Hash the password
-  bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
-    if (err) {
-      console.error('Error hashing password:', err);
-      return res.status(500).send({ message: 'Error hashing password' });
-    }
-
-    const query = `INSERT INTO users (first_name, last_name, email, password, address, phone_number, otp, is_verified)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 0)`;
-
-    db.query(query, [first_name, last_name, email, hashedPassword, address, phone_number, otp], (err, result) => {
-      if (err) {
-        console.error('Error inserting user:', err);
-        return res.status(500).send({ message: 'Database error' });
-      }
-
-      res.status(200).send({ message: 'OTP sent to email', otp });
-    });
-  });
-});
-
-// 🔹 Verify OTP
-app.post('/users/verify-otp', (req, res) => {
-  const { email, otp } = req.body;
-
-  const query = 'SELECT * FROM users WHERE email = ? AND otp = ?';
-  db.query(query, [email, otp], (err, result) => {
-    if (err) return res.status(500).send({ message: 'Database error' });
-
-    if (result.length > 0) {
-      db.query('UPDATE users SET is_verified = 1 WHERE email = ?', [email]);
-      res.status(200).send({ message: 'User verified successfully' });
-    } else {
-      res.status(400).send({ message: 'Invalid OTP' });
-    }
-  });
-});
-
-// 🔹 Login User
-app.post('/users/login', (req, res) => {
-  const { email, password } = req.body;
-
-  const query = 'SELECT * FROM users WHERE email = ? AND is_verified = 1';
-  db.query(query, [email], (err, results) => {
-    if (err) return res.status(500).send({ message: 'Database error' });
-
-    if (results.length === 0) {
-      return res.status(400).send({ message: 'User not found or not verified' });
-    }
-
-    const user = results[0];
-
-    // Compare password with hash
-    bcrypt.compare(password, user.password, (err, isMatch) => {
-      if (err) return res.status(500).send({ message: 'Error comparing passwords' });
-
-      if (isMatch) {
-        res.status(200).send({ message: 'Login successful', user });
-      } else {
-        res.status(400).send({ message: 'Invalid credentials' });
-      }
-    });
-  });
-});
-
-
-app.post('/admin/register', async (req, res) => {
-  const { first_name, last_name, email, password,confirm_password, phone_number } = req.body;
-  
 
   const otp = Math.floor(100000 + Math.random() * 900000);
 
@@ -156,33 +177,43 @@ app.post('/admin/register', async (req, res) => {
         console.error('Database error:', error);
         return res.status(500).json({ message: 'Database error' });
       }
-      res.json({ message: 'Admin registered. OTP sent!', otp });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Your Admin OTP",
+        text: `Your OTP is: ${otp}`
+      };
+
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) return res.status(500).json({ message: "Error sending OTP email", error: err });
+        res.json({ message: 'Admin registered. OTP sent!' });
+      });
     });
   } catch (err) {
     res.status(500).json({ message: 'Error hashing password' });
   }
 });
 
-
-
-
-// Verify OTP
+// ✅ Admin Verify OTP
 app.post('/admin/verify-otp', (req, res) => {
   const { email, otp } = req.body;
 
   db.query('SELECT * FROM admin WHERE email = ? AND otp = ?', [email, otp], (err, result) => {
-      if (err) return res.status(500).json({ message: 'Database error' });
+    if (err) return res.status(500).json({ message: 'Database error' });
 
-      if (result.length > 0) {
-          db.query('UPDATE admin SET is_verified = 1 WHERE email = ?', [email], (error) => {
-              if (error) return res.status(500).json({ message: 'Database update error' });
-              res.status(200).json({ message: 'Admin verified successfully' });
-          });
-      } else {
-          res.status(400).json({ message: 'Invalid OTP' });
-      }
+    if (result.length > 0) {
+      db.query('UPDATE admin SET is_verified = 1 WHERE email = ?', [email], (error) => {
+        if (error) return res.status(500).json({ message: 'Database update error' });
+        res.status(200).json({ message: 'Admin verified successfully' });
+      });
+    } else {
+      res.status(400).json({ message: 'Invalid OTP' });
+    }
   });
 });
+
+// ✅ Admin Login
 app.post('/admin/login', (req, res) => {
   const { email, password } = req.body;
 
@@ -198,21 +229,12 @@ app.post('/admin/login', (req, res) => {
       return res.status(401).json({ message: 'Incorrect password' });
     }
 
-    const token = jwt.sign({ adminId: admin.id }, 'your_secret_key', { expiresIn: '1h' });
+    const token = jwt.sign({ adminId: admin.id }, JWT_SECRET, { expiresIn: '1h' });
     res.status(200).json({ message: 'Login successful', token });
   });
 });
-// Delete rating
-app.delete('/ratings/:id', (req, res) => {
-  const ratingId = req.params.id;
-  const sql = 'DELETE FROM ratings WHERE id = ?';
-  db.query(sql, [ratingId], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Rating deleted successfully' });
-  });
-});
 
-// Start the server
+// ✅ Start the server
 app.listen(5000, () => {
   console.log('Server is running on port 5000');
 });
