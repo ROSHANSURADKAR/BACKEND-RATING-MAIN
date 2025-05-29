@@ -128,33 +128,43 @@ app.post("/users/login", (req, res) => {
 });
 
 // ✅ Insert Rating
-app.post("/ratings", (req, res) => {
-  const { user_name, rating, comments } = req.body;
-  const sql = "INSERT INTO ratings (user_name, rating, comments) VALUES (?, ?, ?)";
-  db.query(sql, [user_name, rating, comments], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "Rating submitted", ratingId: result.insertId });
+// Add Rating
+app.post('/ratings', (req, res) => {
+  const { Product_name, rating, comments, submittedBy } = req.body;
+  const query = 'INSERT INTO ratings (Product_name, rating, comments, submittedBy) VALUES (?, ?, ?, ?)';
+  db.query(query, [Product_name, rating, comments, submittedBy], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.json({ message: "Rating submitted", id: result.insertId });
   });
 });
 
-// ✅ Get all ratings
-app.get("/ratings", (req, res) => {
-  db.query("SELECT * FROM ratings", (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
+// Get Ratings
+app.get('/ratings', (req, res) => {
+  db.query('SELECT * FROM ratings', (err, results) => {
+    if (err) return res.status(500).send(err);
     res.json(results);
   });
 });
 
-// ✅ Delete rating by ID
-app.delete('/ratings/:id', (req, res) => {
-  const ratingId = req.params.id;
-  const sql = 'DELETE FROM ratings WHERE id = ?';
-  db.query(sql, [ratingId], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Rating deleted successfully' });
+// Update Rating
+app.put('/ratings/:id', (req, res) => {
+  const { id } = req.params;
+  const { Product_name, rating, comments, submittedBy } = req.body;
+  const query = 'UPDATE ratings SET Product_name=?, rating=?, comments=?, submittedBy=? WHERE id=?';
+  db.query(query, [Product_name, rating, comments, submittedBy, id], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.json({ message: "Rating updated" });
   });
 });
 
+// Delete Rating
+app.delete('/ratings/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM ratings WHERE id = ?', [id], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.json({ message: "Rating deleted" });
+  });
+});
 // ✅ Admin Registration with OTP
 app.post('/admin/register', async (req, res) => {
   const { first_name, last_name, email, password, confirm_password, phone_number } = req.body;
