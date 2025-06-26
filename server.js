@@ -130,9 +130,9 @@ app.post("/users/login", (req, res) => {
 // ✅ Insert Rating
 // Add Rating
 app.post('/ratings', (req, res) => {
-  const { Product_name, rating, comments, submittedBy } = req.body;
-  const query = 'INSERT INTO ratings (Product_name, rating, comments, submittedBy) VALUES (?, ?, ?, ?)';
-  db.query(query, [Product_name, rating, comments, submittedBy], (err, result) => {
+  const { Product_name, rating,category,subcategory, Comment, submittedBy } = req.body;
+  const query = 'INSERT INTO ratings (Product_name, rating,category,subcategory, Comment, submittedBy) VALUES (?, ?, ?,?, ?, ?)';
+  db.query(query, [Product_name, rating,category,subcategory, Comment, submittedBy], (err, result) => {
     if (err) return res.status(500).send(err);
     res.json({ message: "Rating submitted", id: result.insertId });
   });
@@ -149,9 +149,9 @@ app.get('/ratings', (req, res) => {
 // Update Rating
 app.put('/ratings/:id', (req, res) => {
   const { id } = req.params;
-  const { Product_name, rating, comments, submittedBy } = req.body;
-  const query = 'UPDATE ratings SET Product_name=?, rating=?, comments=?, submittedBy=? WHERE id=?';
-  db.query(query, [Product_name, rating, comments, submittedBy, id], (err, result) => {
+  const { Product_name, rating, category,subcategory,Comment, submittedBy } = req.body;
+  const query = 'UPDATE ratings SET Product_name=?, rating=?,category=?,subcategory=?, Comment=?, submittedBy=? WHERE id=?';
+  db.query(query, [Product_name, rating,category,subcategory, Comment, submittedBy, id], (err, result) => {
     if (err) return res.status(500).send(err);
     res.json({ message: "Rating updated" });
   });
