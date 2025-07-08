@@ -126,6 +126,41 @@ app.post("/users/login", (req, res) => {
     });
   });
 });
+app.post("/users/password", (req, res) => {
+  const { email, currentPassword, newPassword } = req.body;
+
+  if (!email || !currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  // Step 1: Find the user
+  const sql = 'SELECT * FROM users WHERE email = ?';
+  db.query(sql, [email], (err, results) => {
+    if (err) return res.status(500).json({ message: 'Database error', error: err });
+    if (results.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const user = results[0];
+
+    // Step 2: Verify current password
+    bcrypt.compare(currentPassword, user.password, (err, isMatch) => {
+      if (err) return res.status(500).json({ message: 'Error comparing passwords' });
+      if (!isMatch) return res.status(401).json({ message: 'Incorrect current password' });
+
+      // Step 3: Hash new password
+      bcrypt.hash(newPassword, saltRounds, (err, hashedPassword) => {
+        if (err) return res.status(500).json({ message: 'Error hashing new password' });
+
+        // Step 4: Update password in DB
+        const updateSql = 'UPDATE users SET password = ? WHERE email = ?';
+        db.query(updateSql, [hashedPassword, email], (err) => {
+          if (err) return res.status(500).json({ message: 'Error updating password', error: err });
+          res.json({ message: 'Password updated successfully!' });
+        });
+      });
+    });
+  });
+});
+
 
 // ✅ Insert Rating
 // Add Rating
@@ -148,7 +183,7 @@ app.get('/ratings', (req, res) => {
 
 // Update Rating
 app.put('/ratings/:id', (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params['id'];
   const { Product_name, rating, category,subcategory,Comment, submittedBy } = req.body;
   const query = 'UPDATE ratings SET Product_name=?, rating=?,category=?,subcategory=?, Comment=?, submittedBy=? WHERE id=?';
   db.query(query, [Product_name, rating,category,subcategory, Comment, submittedBy, id], (err, result) => {
