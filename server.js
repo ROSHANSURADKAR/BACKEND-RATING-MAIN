@@ -126,6 +126,29 @@ app.post("/users/login", (req, res) => {
     });
   });
 });
+// ✅ Update User Name (first_name and last_name)
+app.put('/users/username', (req, res) => {
+  const { email, first_name, last_name } = req.body;
+
+  if (!email || !first_name || !last_name) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  const sql = 'UPDATE users SET first_name = ?, last_name = ? WHERE email = ?';
+  db.query(sql, [first_name, last_name, email], (err, result) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ message: 'Database error', error: err });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'Username updated successfully' });
+  });
+});
+
 app.post("/users/password", (req, res) => {
   const { email, currentPassword, newPassword } = req.body;
 
@@ -159,6 +182,53 @@ app.post("/users/password", (req, res) => {
       });
     });
   });
+});
+app.post('/users/phonenumber', (req, res) => {
+  const { email, newPhoneNumber } = req.body;
+
+  if (!email || !newPhoneNumber) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  const sql = 'UPDATE users SET phone_number = ? WHERE email = ?';
+  db.query(sql, [newPhoneNumber, email], (err, result) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    res.json({ message: 'Phone number updated successfully' });
+  });
+});
+app.post('/users/address', (req, res) => {
+  const { email, newAddress } = req.body;
+
+  if (!email || !newAddress) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  const sql = 'UPDATE users SET address = ? WHERE email = ?';
+  db.query(sql, [newAddress, email], (err, result) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    res.json({ message: 'Address updated successfully' });
+  });
+});
+app.post('/users/forgot-password', (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  // You can generate a reset token here and send an email
+  const resetToken = Math.random().toString(36).substr(2, 8); // or JWT-based
+
+  // TODO: Save token in DB and send it via email
+  res.status(200).json({ message: 'Reset token generated and email sent (mock)' });
 });
 
 
