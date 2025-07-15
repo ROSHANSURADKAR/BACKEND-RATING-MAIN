@@ -272,7 +272,7 @@ app.delete('/ratings/:id', (req, res) => {
 });
 // ✅ Admin Registration with OTP
 app.post('/admin/register', async (req, res) => {
-  const { first_name, last_name, email, password, confirm_password, phone_number } = req.body;
+  const { first_name, last_name, email, password, confirm_password,address, phone_number } = req.body;
 
   if (password !== confirm_password) {
     return res.status(400).json({ message: "Passwords do not match" });
@@ -283,11 +283,11 @@ app.post('/admin/register', async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const sql = `
-      INSERT INTO admin (first_name, last_name, email, password, phone_number, otp, is_verified) 
-      VALUES (?, ?, ?, ?, ?, ?, 0)
+      INSERT INTO admin (first_name, last_name, email, password,address, phone_number, otp, is_verified) 
+      VALUES (?, ?, ?, ?, ?, ?,?, 0)
     `;
 
-    db.query(sql, [first_name, last_name, email, hashedPassword, phone_number, otp], (error, result) => {
+    db.query(sql, [first_name, last_name, email, hashedPassword,address, phone_number, otp], (error, result) => {
       if (error) {
         console.error('Database error:', error);
         return res.status(500).json({ message: 'Database error' });
